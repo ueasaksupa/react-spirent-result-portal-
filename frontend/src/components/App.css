@@ -1,0 +1,29 @@
+/*
+DEFINE 100 % height of main component
+*/
+html,
+body {
+    height: 100%;
+    margin: 0;
+    background-color: #393e46;
+}
+
+#root {
+    height: 100%;
+    color: aliceblue;
+    background-color: #393e46;
+}
+
+.nav-link-color {
+    color: #29a19c;
+}
+
+.uploder-container {
+    margin: 0 25%;
+    background-color: #222831;
+    border-radius: 10px;
+    padding: 30px;
+}
+.checkbox-subheader {
+    padding: 0 20px;
+}
