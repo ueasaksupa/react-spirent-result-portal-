@@ -27,3 +27,6 @@ body {
 .checkbox-subheader {
     padding: 0 20px;
 }
+.action-icon:hover {
+    opacity: 0.5;
+}

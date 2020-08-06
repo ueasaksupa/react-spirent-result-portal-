@@ -29,6 +29,7 @@ services:
         restart: always
         environment:
             MEDIA_DIR: /media
+            DB_HOST: "192.168.11.127"
 
     frontend:
         build:

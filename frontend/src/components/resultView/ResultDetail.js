@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import backend from "../api/backend";
 
 import DataTable, { createTheme } from "react-data-table-component";
+import UploadedFile from "./UploadedFile";
 
 const SubHeader = (props) => {
     return (
@@ -66,7 +67,9 @@ const SubHeader = (props) => {
 const ResultDetail = (props) => {
     const staticResult = useRef();
     const testcaseName = useRef();
+    const [files, setFiles] = useState(null);
     const [error, setError] = useState(null);
+    const [errorMsg, setErrorMsg] = useState(null);
     const [data, setData] = useState(null);
     const [filter, setFilter] = useState({
         showBG: true,
@@ -78,16 +81,20 @@ const ResultDetail = (props) => {
 
     useEffect(() => {
         document.title = "portal :: Result detail";
-        const preProcessData = async () => {
-            let result, testcases, template;
-            // get result
+        preProcessData();
+    }, [props.match.params.test_number]);
+
+    const preProcessData = async () => {
+        let result, testcases, template;
+        // get result
+        try {
             let resultResp = await backend.get(`/result/${props.match.params.test_number}`);
             if (resultResp.status === 200) {
                 console.log("resultDetail:: ", resultResp.data);
                 result = resultResp.data;
-            } else {
-                setError(true);
+                setFiles(resultResp.data.files);
             }
+
             // get testacase
             let testcaseResp = await backend.get("/testcases");
             if (testcaseResp.status === 200 && testcaseResp.data.length !== 0) {
@@ -97,16 +104,12 @@ const ResultDetail = (props) => {
                 }
                 testcases = tmpObj;
                 console.log("testcases:: ", testcases);
-            } else {
-                setError(true);
             }
             // get template
             let templateResp = await backend.get("/template");
             if (templateResp.status === 200) {
                 console.log("template:: ", templateResp.data);
                 template = templateResp.data;
-            } else {
-                setError(true);
             }
             // set testcase name
             testcaseName.current = `${testcases[result.testcase].no}:: ${testcases[result.testcase].name}`;
@@ -135,9 +138,11 @@ const ResultDetail = (props) => {
             }
             staticResult.current = tmp;
             setData(tmp);
-        };
-        preProcessData();
-    }, [props.match.params.test_number]);
+        } catch (err) {
+            // console.log(err);
+            setError({ ...err });
+        }
+    };
 
     const applyFilter = () => {
         let tmp = [];
@@ -234,6 +239,7 @@ const ResultDetail = (props) => {
     if (data) {
         return (
             <div className="container-fluid">
+                <UploadedFile files={files} preProcessData={preProcessData} testNumber={props.match.params.test_number} />
                 <DataTable
                     title={testcaseName.current}
                     highlightOnHover
@@ -253,11 +259,16 @@ const ResultDetail = (props) => {
         );
     } else {
         if (error) {
-            return (
-                <div className="text-center">
-                    Cannot connect to API backend please check with API service or refresh the page.
-                </div>
-            );
+            if (error.response) {
+                return (
+                    <div className="text-center">
+                        {error.response.status}
+                        {error.response.statusText}
+                    </div>
+                );
+            } else {
+                return <div className="text-center">NETWORK ERROR : check backend connection</div>;
+            }
         } else {
             return <div className="text-center">Loading ...</div>;
         }

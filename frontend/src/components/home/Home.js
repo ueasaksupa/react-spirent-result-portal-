@@ -9,6 +9,7 @@ import DataTable, { createTheme } from "react-data-table-component";
 const Home = () => {
     const staticResult = useRef();
     const [modalShow, setModalShow] = useState(false);
+    const [modalContent, setModalContent] = useState(null);
     const [selectedRemark, setSelectedRemark] = useState(null);
     const [selectedTestNumber, setSelectedTestNumber] = useState(null);
     const [data, setData] = useState(null);
@@ -18,48 +19,50 @@ const Home = () => {
     // Component did mount
     useEffect(() => {
         document.title = "portal :: All results";
-        const preProcessData = async () => {
-            let results, testcases;
-            // get results
-            try {
-                const resultReps = await backend.get("/results");
-                if (resultReps.status === 200) {
-                    console.log("results:: ", resultReps.data);
-                    results = resultReps.data;
-                } else {
-                    setError(true);
-                }
-                // get testcase
-                const testcaseResp = await backend.get("/testcases");
-                console.log("testcases:: ", testcaseResp.data);
-                if (testcaseResp.status === 200 && testcaseResp.data.length !== 0) {
-                    const tmpObj = {};
-                    for (const record of testcaseResp.data) {
-                        tmpObj[record._id] = record;
-                    }
-                    testcases = tmpObj;
-                } else {
-                    setError(true);
-                }
-                // prepare data for data-table
-                const tmp = results.map((row) => {
-                    return {
-                        test_number: parseInt(row.test_number),
-                        testcase: `${testcases[row.testcase].no} :: ${testcases[row.testcase].name}`,
-                        file_upload: row.test_result.length,
-                        remark: row.remark,
-                        created_on: new Date(row.created_on).toLocaleString("en-US", { timeZone: "Asia/Bangkok" }),
-                    };
-                });
-                staticResult.current = tmp;
-                setData(tmp);
-            } catch (error) {
-                console.log(error);
-                setError(true);
-            }
-        };
         preProcessData();
     }, []);
+    //
+    const preProcessData = async () => {
+        let results, testcases;
+        // get results
+        console.log("preprocess data");
+        try {
+            const resultReps = await backend.get("/results");
+            if (resultReps.status === 200) {
+                console.log("results:: ", resultReps.data);
+                results = resultReps.data;
+            } else {
+                setError(true);
+            }
+            // get testcase
+            const testcaseResp = await backend.get("/testcases");
+            console.log("testcases:: ", testcaseResp.data);
+            if (testcaseResp.status === 200 && testcaseResp.data.length !== 0) {
+                const tmpObj = {};
+                for (const record of testcaseResp.data) {
+                    tmpObj[record._id] = record;
+                }
+                testcases = tmpObj;
+            } else {
+                setError(true);
+            }
+            // prepare data for data-table
+            const tmp = results.map((row) => {
+                return {
+                    test_number: parseInt(row.test_number),
+                    testcase: `${testcases[row.testcase].no} :: ${testcases[row.testcase].name}`,
+                    file_upload: row.test_result.length,
+                    remark: row.remark,
+                    created_on: new Date(row.created_on).toLocaleString("en-US", { timeZone: "Asia/Bangkok" }),
+                };
+            });
+            staticResult.current = tmp;
+            setData(tmp);
+        } catch (error) {
+            console.log(error);
+            setError(true);
+        }
+    };
     //
     const onSearchChangeHandler = (e) => {
         console.log(e.target.value);
@@ -76,6 +79,11 @@ const Home = () => {
         }
         setData(tmp);
     };
+    const handleDeleteTestSubject = async (test_number) => {
+        await backend.delete(`/result/${test_number}`);
+        preProcessData();
+        handleClose();
+    };
     const handleClose = () => setModalShow(false);
     const handleShow = () => setModalShow(true);
     const handleRemarkSubmit = () => {
@@ -83,6 +91,43 @@ const Home = () => {
             handleClose();
             document.getElementById(`remark-${selectedTestNumber}`).innerText = selectedRemark;
         });
+    };
+    const modalContentRemarkEdit = () => {
+        return (
+            <>
+                <Modal.Header closeButton>
+                    <Modal.Title>Manage remark</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    <input type="text" value={selectedRemark} onChange={(e) => setSelectedRemark(e.target.value)} />
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button variant="secondary" onClick={handleClose}>
+                        Close
+                    </Button>
+                    <Button variant="primary" onClick={handleRemarkSubmit}>
+                        Save Changes
+                    </Button>
+                </Modal.Footer>
+            </>
+        );
+    };
+    const modalContentDeleteConfirm = (test_number) => {
+        return (
+            <>
+                <Modal.Header closeButton>
+                    <Modal.Title>Delete test {test_number}</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    <Button variant="secondary" onClick={handleClose}>
+                        Close
+                    </Button>
+                    <Button variant="danger" onClick={() => handleDeleteTestSubject(test_number)}>
+                        Delete
+                    </Button>
+                </Modal.Body>
+            </>
+        );
     };
     /*
     data-table
@@ -125,7 +170,7 @@ const Home = () => {
             sortable: false,
         },
         {
-            name: "remark",
+            name: "action",
             sortable: false,
             right: true,
             // ignoreRowClick: true,
@@ -136,8 +181,20 @@ const Home = () => {
                     <i
                         style={{ color: "#29a19c", padding: "0 10px" }}
                         type="button"
-                        className="fas fa-edit"
+                        className="fas fa-edit action-icon"
                         onClick={() => {
+                            setModalContent(modalContentRemarkEdit());
+                            setSelectedRemark(row.remark);
+                            setSelectedTestNumber(row.test_number);
+                            handleShow();
+                        }}
+                    ></i>
+                    <i
+                        style={{ color: "#e76f51", padding: "0 10px" }}
+                        type="button"
+                        className="fas fa-trash-alt action-icon"
+                        onClick={() => {
+                            setModalContent(modalContentDeleteConfirm(row.test_number));
                             setSelectedRemark(row.remark);
                             setSelectedTestNumber(row.test_number);
                             handleShow();
@@ -176,20 +233,7 @@ const Home = () => {
                     onRowClicked={(row) => history.push(`/result/${row.test_number}`)}
                 />
                 <Modal show={modalShow} onHide={handleClose}>
-                    <Modal.Header closeButton>
-                        <Modal.Title>Manage remark</Modal.Title>
-                    </Modal.Header>
-                    <Modal.Body>
-                        <input type="text" value={selectedRemark} onChange={(e) => setSelectedRemark(e.target.value)} />
-                    </Modal.Body>
-                    <Modal.Footer>
-                        <Button variant="secondary" onClick={handleClose}>
-                            Close
-                        </Button>
-                        <Button variant="primary" onClick={handleRemarkSubmit}>
-                            Save Changes
-                        </Button>
-                    </Modal.Footer>
+                    {modalContent}
                 </Modal>
             </div>
         );

@@ -5,6 +5,7 @@ from openpyxl import Workbook
 from openpyxl import load_workbook
 # mongodb
 from pymongo import MongoClient
+from bson.objectid import ObjectId
 #
 from pprint import pprint
 from datetime import datetime
@@ -18,10 +19,14 @@ if "MEDIA_DIR" in os.environ:
     MEDIA_DIR = os.environ['MEDIA_DIR']
 else:
     MEDIA_DIR = "./media"
+if "DB_HOST" in os.environ:
+    DB_HOST = os.environ['DB_HOST']
+else:
+    DB_HOST = "127.0.0.1"
 print ("uploaded file will be saved at", MEDIA_DIR)
 
 cors = CORS(app)
-client = MongoClient('mongodb://mongo:27017',
+client = MongoClient('mongodb://{DB_HOST}:27017'.format(DB_HOST=DB_HOST),
                      username="root", password="dbpass")
 spirentPortalDB = client.spirentPortalDB
 
@@ -112,7 +117,7 @@ def upload_result():
         #
         # Add to testResult
         #
-        post_data = {"test_number": test_number, "results": values_dict}
+        post_data = {"test_number": test_number, "filename": saved_filename, "results": values_dict}
         result = spirentPortalDB.testResult.insert_one(post_data)
         print('Data ID: {0} has been inserted'.format(result.inserted_id))
         current_test_result_id = str(result.inserted_id)
@@ -141,9 +146,14 @@ def upload_result():
 @app.route("/result/<test_number>", methods=["GET"])
 def get_result_test_number(test_number):
     results = spirentPortalDB.testResult.find({"test_number" : test_number})
+    if not results:
+        return "", 404
     testSubject = spirentPortalDB.testSubject.find_one({"test_number" : test_number})
-    return_results = {"testcase": testSubject["testcase"], "results": {}}
+    if not testSubject:
+        return "", 404
+    return_results = {"testcase": testSubject["testcase"], "files":[], "results": {}}
     for row in results:
+        return_results["files"].append({"filename":row["filename"], "id": str(row["_id"])})
         for k,v in row["results"].items():
             if k in return_results["results"] :
             # stream already exist, update the drop time to highest
@@ -162,6 +172,8 @@ def get_result_test_number(test_number):
 @app.route("/result/latest", methods=["GET"])
 def get_result_latest():
     result = spirentPortalDB.testSubject.find_one(sort=[("created_on", -1)])
+    if not result:
+        return "",404
     return jsonify(
         {k: v for k, v in result.items() if k != '_id'}
     )
@@ -218,9 +230,26 @@ def patch_remark(test_number):
     spirentPortalDB.testSubject.update_one(
         {"test_number":test_number}, 
         {"$set": {"remark" : new_remark}}
-    )
-    
+    )    
     return "", 204
+
+
+@app.route("/result/<test_number>", methods=["DELETE"])
+def delete_result(test_number):
+    spirentPortalDB.testSubject.delete_one({ "test_number": test_number })
+    spirentPortalDB.testResult.delete_many({ "test_number": test_number })
+    return "", 204
+
+
+@app.route("/result/<test_number>/<testResultId>", methods=["DELETE"])
+def delete_result_id(test_number,testResultId):
+    spirentPortalDB.testResult.delete_one({ "test_number": test_number, "_id": ObjectId(testResultId) })
+    spirentPortalDB.testSubject.update(
+        { "test_number": test_number },
+        {"$pull": { "test_result": testResultId } }
+    )
+    return "", 204
+
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5050)
