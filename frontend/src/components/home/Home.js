@@ -8,8 +8,7 @@ import DataTable, { createTheme } from "react-data-table-component";
 
 const Home = () => {
     const staticResult = useRef();
-    const [modalShow, setModalShow] = useState(false);
-    const [modalContent, setModalContent] = useState(null);
+    const [modalShow, setModalShow] = useState({ remark: false, delete: false });
     const [selectedRemark, setSelectedRemark] = useState(null);
     const [selectedTestNumber, setSelectedTestNumber] = useState(null);
     const [data, setData] = useState(null);
@@ -82,52 +81,19 @@ const Home = () => {
     const handleDeleteTestSubject = async (test_number) => {
         await backend.delete(`/result/${test_number}`);
         preProcessData();
-        handleClose();
+        handleClose("delete");
     };
-    const handleClose = () => setModalShow(false);
-    const handleShow = () => setModalShow(true);
+    const handleClose = (modalType) => {
+        setModalShow({ ...modalShow, [modalType]: false });
+    };
+    const handleShow = (modalType) => {
+        setModalShow({ ...modalShow, [modalType]: true });
+    };
     const handleRemarkSubmit = () => {
         backend.patch(`/remark/${selectedTestNumber}`, { new_remark: selectedRemark }).then((response) => {
-            handleClose();
-            document.getElementById(`remark-${selectedTestNumber}`).innerText = selectedRemark;
+            handleClose("remark");
+            preProcessData();
         });
-    };
-    const modalContentRemarkEdit = () => {
-        return (
-            <>
-                <Modal.Header closeButton>
-                    <Modal.Title>Manage remark</Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                    <input type="text" value={selectedRemark} onChange={(e) => setSelectedRemark(e.target.value)} />
-                </Modal.Body>
-                <Modal.Footer>
-                    <Button variant="secondary" onClick={handleClose}>
-                        Close
-                    </Button>
-                    <Button variant="primary" onClick={handleRemarkSubmit}>
-                        Save Changes
-                    </Button>
-                </Modal.Footer>
-            </>
-        );
-    };
-    const modalContentDeleteConfirm = (test_number) => {
-        return (
-            <>
-                <Modal.Header closeButton>
-                    <Modal.Title>Delete test {test_number}</Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                    <Button variant="secondary" onClick={handleClose}>
-                        Close
-                    </Button>
-                    <Button variant="danger" onClick={() => handleDeleteTestSubject(test_number)}>
-                        Delete
-                    </Button>
-                </Modal.Body>
-            </>
-        );
     };
     /*
     data-table
@@ -183,10 +149,9 @@ const Home = () => {
                         type="button"
                         className="fas fa-edit action-icon"
                         onClick={() => {
-                            setModalContent(modalContentRemarkEdit());
                             setSelectedRemark(row.remark);
                             setSelectedTestNumber(row.test_number);
-                            handleShow();
+                            handleShow("remark");
                         }}
                     ></i>
                     <i
@@ -194,10 +159,9 @@ const Home = () => {
                         type="button"
                         className="fas fa-trash-alt action-icon"
                         onClick={() => {
-                            setModalContent(modalContentDeleteConfirm(row.test_number));
                             setSelectedRemark(row.remark);
                             setSelectedTestNumber(row.test_number);
-                            handleShow();
+                            handleShow("delete");
                         }}
                     ></i>
                 </div>
@@ -232,8 +196,34 @@ const Home = () => {
                     theme="solarized"
                     onRowClicked={(row) => history.push(`/result/${row.test_number}`)}
                 />
-                <Modal show={modalShow} onHide={handleClose}>
-                    {modalContent}
+                <Modal show={modalShow.remark} onHide={() => handleClose("remark")}>
+                    <Modal.Header closeButton>
+                        <Modal.Title>Manage remark</Modal.Title>
+                    </Modal.Header>
+                    <Modal.Body>
+                        <input type="text" value={selectedRemark} onChange={(e) => setSelectedRemark(e.target.value)} />
+                    </Modal.Body>
+                    <Modal.Footer>
+                        <Button variant="secondary" onClick={() => handleClose("remark")}>
+                            Close
+                        </Button>
+                        <Button variant="primary" onClick={handleRemarkSubmit}>
+                            Save Changes
+                        </Button>
+                    </Modal.Footer>
+                </Modal>
+                <Modal show={modalShow.delete} onHide={() => handleClose("delete")}>
+                    <Modal.Header closeButton>
+                        <Modal.Title>Delete test {selectedTestNumber}</Modal.Title>
+                    </Modal.Header>
+                    <Modal.Body>
+                        <Button variant="secondary" onClick={() => handleClose("delete")}>
+                            Close
+                        </Button>
+                        <Button variant="danger" onClick={() => handleDeleteTestSubject(selectedTestNumber)}>
+                            Delete
+                        </Button>
+                    </Modal.Body>
                 </Modal>
             </div>
         );
